@@ -42,7 +42,7 @@ impl BlockHeaderBase for WaveBlockHeader {
 #[derive(Debug, PartialEq)]
 pub enum MMFParseResult {
     OK,
-    NOT_FOUND_SAMF_HEADER,
+    NOT_FOUND_SMAF_HEADER,
     UNKNOWN_ERROR,
 }
 
@@ -66,7 +66,14 @@ impl MMFFileInfo {
 
 pub fn parse(file:Vec<Bytes>) -> MMFFileInfo {
     let mut file_info:MMFFileInfo = MMFFileInfo::new();
-    file_info.result = MMFParseResult::UNKNOWN_ERROR;
+    
+    //If no data in file bytes vector, Just return not found smaf header
+    if file.len() <= 0 {
+        file_info.result = MMFParseResult::NOT_FOUND_SMAF_HEADER;
+    }
+
+    
+    
     file_info
 }
 
