@@ -39,6 +39,7 @@ impl BlockHeaderBase for WaveBlockHeader {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub enum MMFParseResult {
     OK,
     NOT_FOUND_SAMF_HEADER,
@@ -63,10 +64,6 @@ impl MMFFileInfo {
     }
 }
 
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
-
 pub fn parse(file:Vec<Bytes>) -> MMFFileInfo {
     let mut file_info:MMFFileInfo = MMFFileInfo::new();
     file_info.result = MMFParseResult::UNKNOWN_ERROR;
@@ -79,7 +76,7 @@ mod tests {
 
     #[test]
     fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 0);
+        let info = parse(Vec::new());
+        assert_eq!(info.result, MMFParseResult::OK);
     }
 }
