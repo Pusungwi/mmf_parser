@@ -1,4 +1,3 @@
-use std::{str::Bytes, result};
 use bytestream_rs::bytestream::{ByteStream, ByteStreamError};
 
 struct FileHeader {
@@ -65,7 +64,7 @@ impl MmfFileInfo {
     pub fn new() -> MmfFileInfo {
         MmfFileInfo {
             result: MmfParseResult::UNKNOWN_ERROR,
-            header: FileHeader { data_size: 0, class: todo!(), file_type: todo!(), code_type: todo!(), status: todo!(), counts: todo!(), song_title: todo!(), version: todo!() },
+            header: FileHeader { data_size: 0, class: 0, file_type: 0, code_type: 0, status: 0, counts: 0, song_title:"".to_string(), version: 0 },
             midi_blocks: Vec::new(),
             wave_blocks: Vec::new(),
         }
@@ -77,20 +76,50 @@ pub fn parse(file:Vec<u8>) -> MmfFileInfo {
 
     let mut stream = ByteStream::new_from_buffer(file);
     //If not found data in file bytes vector, Just return not found smaf header
-    if stream.length <= 0 {
+    if stream.length <= 0 || !stream.read_string_size(4).unwrap().eq("MMMD") {
         file_info.result = MmfParseResult::NOT_FOUND_SMAF_HEADER;
+        return file_info;
     }
 
+    let smaf_size = stream.read_uint32();
+    match smaf_size {
+        Ok(size) => {
+            file_info.header.data_size = size as _;
+        }
+        Err(_err) => {
+            file_info.result = MmfParseResult::UNKNOWN_ERROR;
+            return file_info;
+        }
+    }
+
+    //Finally, All infos are set.
     file_info
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs::File;
+    use std::io::Read;
+
+    //https://www.reddit.com/r/rust/comments/dekpl5/how_to_read_binary_data_from_a_file_into_a_vecu8/
+    fn get_file_as_byte_vec(filename: &String) -> Vec<u8> {
+        match std::fs::read(filename) {
+            Ok(bytes) => {
+                return bytes;
+            }
+            Err(e) => {
+                if e.kind() == std::io::ErrorKind::PermissionDenied {
+                    eprintln!("please run again with appropriate permissions.");
+                }
+                panic!("{}", e);
+            }
+        }
+    }
 
     #[test]
     fn it_works() {
-        let info = parse(Vec::new());
+        let info = parse(get_file_as_byte_vec(&String::from("test.mmf")));
         assert_eq!(info.result, MmfParseResult::OK);
     }
 }
