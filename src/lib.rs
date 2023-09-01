@@ -93,6 +93,7 @@ pub fn parse(file:Vec<u8>) -> MmfFileInfo {
     }
 
     //Finally, All infos are set.
+    file_info.result = MmfParseResult::OK;
     file_info
 }
 
@@ -117,7 +118,8 @@ mod tests {
 
     #[test]
     fn it_works() {
-        let info = parse(get_file_as_byte_vec(&String::from("test.mmf")));
+        let info = parse(get_file_as_byte_vec(&String::from("mmf_parser_test.mmf")));
         assert_eq!(info.result, MmfParseResult::OK);
+        assert_eq!(info.header.data_size, 1625);
     }
 }
