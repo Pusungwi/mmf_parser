@@ -99,8 +99,6 @@ pub fn parse(file:Vec<u8>) -> MmfFileInfo {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs::File;
-    use std::io::Read;
 
     //https://www.reddit.com/r/rust/comments/dekpl5/how_to_read_binary_data_from_a_file_into_a_vecu8/
     fn get_file_as_byte_vec(filename: &String) -> Vec<u8> {
