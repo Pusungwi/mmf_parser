@@ -1,7 +1,13 @@
 use bytestream_rs::bytestream::{ByteStream, ByteStreamError};
 
-struct FileHeader {
-    data_size:usize,
+trait BlockHeaderBase {
+    fn signature(&self) -> String;
+    fn size(&self) -> Option<usize>;
+}
+
+struct ContentInfoBlock {
+    signature:String,
+    size:usize,
     class:u8,
     file_type:u8,
     code_type:u8,
@@ -11,9 +17,30 @@ struct FileHeader {
     version:u8,
 }
 
-trait BlockHeaderBase {
-    fn signature(&self) -> String;
-    fn size(&self) -> Option<usize>;
+impl BlockHeaderBase for ContentInfoBlock {
+    fn signature(&self) -> String {
+        self.signature.clone()
+    }
+
+    fn size(&self) -> Option<usize> {
+        Some(self.size.clone())
+    }
+}
+
+impl Default for ContentInfoBlock {
+    fn default() -> Self {
+        ContentInfoBlock {
+            signature: String::new(),
+            size: 0,
+            class: 0,
+            file_type: 0,
+            code_type: 0,
+            status: 0,
+            counts: 0,
+            song_title: String::new(),
+            version: 0,
+        }
+    }
 }
 
 struct MidiBlockHeader {
@@ -55,7 +82,8 @@ pub enum MmfParseResult {
 
 pub struct MmfFileInfo {
     result:MmfParseResult,
-    header:FileHeader,
+    data_size:usize,
+    cnti_block:ContentInfoBlock,
     midi_blocks:Vec<MidiBlockHeader>,
     wave_blocks:Vec<WaveBlockHeader>,
 }
@@ -64,7 +92,8 @@ impl MmfFileInfo {
     pub fn new() -> MmfFileInfo {
         MmfFileInfo {
             result: MmfParseResult::UnknownError,
-            header: FileHeader { data_size: 0, class: 0, file_type: 0, code_type: 0, status: 0, counts: 0, song_title:"".to_string(), version: 0 },
+            data_size: 0,
+            cnti_block: ContentInfoBlock::default(),
             midi_blocks: Vec::new(),
             wave_blocks: Vec::new(),
         }
@@ -84,11 +113,71 @@ pub fn parse(file:Vec<u8>) -> MmfFileInfo {
     let smaf_size = stream.read_uint32();
     match smaf_size {
         Ok(size) => {
-            file_info.header.data_size = size as _;
+            file_info.data_size = size as _;
         }
         Err(_err) => {
             file_info.result = MmfParseResult::UnknownError;
             return file_info;
+        }
+    }
+
+    //Read content info block info
+    let cnti_block_signature = "CNTI";
+    if stream.read_string_size(4).unwrap().eq(cnti_block_signature) {
+        file_info.cnti_block.signature = cnti_block_signature.to_string();
+        
+        let cnti_block_size = stream.read_uint32();
+        match cnti_block_size {
+            Ok(size) => {
+                file_info.cnti_block.size = size as _;
+            }
+            Err(_err) => {
+            }
+        }
+
+        let cnti_block_class = stream.read_byte();
+        match cnti_block_class {
+            Ok(class) => {
+                file_info.cnti_block.class = class as _;
+            }
+            Err(_err) => {
+            }
+        }
+
+        let cnti_block_file_type = stream.read_byte();
+        match cnti_block_file_type {
+            Ok(class) => {
+                file_info.cnti_block.file_type = class as _;
+            }
+            Err(_err) => {
+            }
+        }
+
+        let cnti_block_code_type = stream.read_byte();
+        match cnti_block_code_type {
+            Ok(class) => {
+                file_info.cnti_block.code_type = class as _;
+            }
+            Err(_err) => {
+            }
+        }
+
+        let cnti_block_status = stream.read_byte();
+        match cnti_block_status {
+            Ok(class) => {
+                file_info.cnti_block.status = class as _;
+            }
+            Err(_err) => {
+            }
+        }
+
+        let cnti_block_counts = stream.read_byte();
+        match cnti_block_counts {
+            Ok(class) => {
+                file_info.cnti_block.counts = class as _;
+            }
+            Err(_err) => {
+            }
         }
     }
 
@@ -120,6 +209,6 @@ mod tests {
     fn it_works() {
         let info = parse(get_file_as_byte_vec(&String::from("mmf_parser_test.mmf")));
         assert_eq!(info.result, MmfParseResult::OK);
-        assert_eq!(info.header.data_size, 1625);
+        assert_eq!(info.data_size, 1625);
     }
 }
