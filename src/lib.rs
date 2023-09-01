@@ -49,8 +49,8 @@ impl BlockHeaderBase for WaveBlockHeader {
 #[derive(Debug, PartialEq)]
 pub enum MmfParseResult {
     OK,
-    NOT_FOUND_SMAF_HEADER,
-    UNKNOWN_ERROR,
+    NotFoundSmafHeader,
+    UnknownError,
 }
 
 pub struct MmfFileInfo {
@@ -63,7 +63,7 @@ pub struct MmfFileInfo {
 impl MmfFileInfo {
     pub fn new() -> MmfFileInfo {
         MmfFileInfo {
-            result: MmfParseResult::UNKNOWN_ERROR,
+            result: MmfParseResult::UnknownError,
             header: FileHeader { data_size: 0, class: 0, file_type: 0, code_type: 0, status: 0, counts: 0, song_title:"".to_string(), version: 0 },
             midi_blocks: Vec::new(),
             wave_blocks: Vec::new(),
@@ -77,7 +77,7 @@ pub fn parse(file:Vec<u8>) -> MmfFileInfo {
     let mut stream = ByteStream::new_from_buffer(file);
     //If not found data in file bytes vector, Just return not found smaf header
     if stream.length <= 0 || !stream.read_string_size(4).unwrap().eq("MMMD") {
-        file_info.result = MmfParseResult::NOT_FOUND_SMAF_HEADER;
+        file_info.result = MmfParseResult::NotFoundSmafHeader;
         return file_info;
     }
 
@@ -87,7 +87,7 @@ pub fn parse(file:Vec<u8>) -> MmfFileInfo {
             file_info.header.data_size = size as _;
         }
         Err(_err) => {
-            file_info.result = MmfParseResult::UNKNOWN_ERROR;
+            file_info.result = MmfParseResult::UnknownError;
             return file_info;
         }
     }
