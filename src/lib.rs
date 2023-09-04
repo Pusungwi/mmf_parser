@@ -1,4 +1,5 @@
-use bytestream_rs::bytestream::{ByteStream, ByteStreamError};
+use std::io::{self, Cursor, Read};
+use byteorder::{ReadBytesExt, WriteBytesExt, BigEndian, LittleEndian};
 
 trait BlockHeaderBase {
     fn signature(&self) -> String;
@@ -43,12 +44,14 @@ impl Default for ContentInfoBlock {
     }
 }
 
-struct MidiBlockHeader {
+struct MidiTrackBlock {
     signature:String,
-    size:usize, 
+    size:usize,
+    track_no:u8,
+    data:Vec<u8>,
 }
 
-impl BlockHeaderBase for MidiBlockHeader {
+impl BlockHeaderBase for MidiTrackBlock {
     fn signature(&self) -> String {
         self.signature.clone()
     }
@@ -58,12 +61,14 @@ impl BlockHeaderBase for MidiBlockHeader {
     }
 }
 
-struct WaveBlockHeader {
+struct WaveTrackBlock {
     signature:String,
-    size:usize, 
+    size:usize,
+    track_no:u8,
+    data:Vec<u8>,
 }
 
-impl BlockHeaderBase for WaveBlockHeader {
+impl BlockHeaderBase for WaveTrackBlock {
     fn signature(&self) -> String {
         self.signature.clone()
     }
@@ -84,8 +89,8 @@ pub struct MmfFileInfo {
     result:MmfParseResult,
     data_size:usize,
     cnti_block:ContentInfoBlock,
-    midi_blocks:Vec<MidiBlockHeader>,
-    wave_blocks:Vec<WaveBlockHeader>,
+    midi_blocks:Vec<MidiTrackBlock>,
+    wave_blocks:Vec<WaveTrackBlock>,
 }
 
 impl MmfFileInfo {
@@ -100,17 +105,39 @@ impl MmfFileInfo {
     }
 }
 
+fn find_block_with_tag<R: Read>(stream: &mut R, tag: &[u8]) -> io::Result<Vec<u8>> {
+    let mut buffer = [0; 1024];
+    let mut block = Vec::new();
+
+    loop {
+        let bytes_read = stream.read(&mut buffer)?;
+        if bytes_read == 0 {
+            break;
+        }
+
+        block.extend_from_slice(&buffer[..bytes_read]);
+
+        if let Some(index) = block.windows(tag.len()).position(|window| window == tag) {
+            block.truncate(index + tag.len());
+            return Ok(block);
+        }
+    }
+
+    Err(io::Error::new(io::ErrorKind::NotFound, "Block not found"))
+}
+
 pub fn parse(file:Vec<u8>) -> MmfFileInfo {
     let mut file_info:MmfFileInfo = MmfFileInfo::new();
 
-    let mut stream = ByteStream::new_from_buffer(file);
+    let mut stream = Cursor::new(file);
     //If not found data in file bytes vector, Just return not found smaf header
-    if stream.length <= 0 || !stream.read_string_size(4).unwrap().eq("MMMD") {
+    if !stream.read_u8().unwrap() == b'M' || !stream.read_u8().unwrap() == b'M' ||
+        !stream.read_u8().unwrap() == b'M' || !stream.read_u8().unwrap() == b'D'  {
         file_info.result = MmfParseResult::NotFoundSmafHeader;
         return file_info;
     }
 
-    let smaf_size = stream.read_uint32();
+    let smaf_size = stream.read_u32::<BigEndian>();
     match smaf_size {
         Ok(size) => {
             file_info.data_size = size as _;
@@ -120,13 +147,13 @@ pub fn parse(file:Vec<u8>) -> MmfFileInfo {
             return file_info;
         }
     }
-
+    
     //Read content info block info
-    let cnti_block_signature = "CNTI";
-    if stream.read_string_size(4).unwrap().eq(cnti_block_signature) {
-        file_info.cnti_block.signature = cnti_block_signature.to_string();
+    if !stream.read_u8().unwrap() == b'C' || !stream.read_u8().unwrap() == b'N' ||
+        !stream.read_u8().unwrap() == b'T' || !stream.read_u8().unwrap() == b'I'  {
+        file_info.cnti_block.signature = String::from("CNTI");
         
-        let cnti_block_size = stream.read_uint32();
+        let cnti_block_size = stream.read_u32::<BigEndian>();
         match cnti_block_size {
             Ok(size) => {
                 file_info.cnti_block.size = size as _;
@@ -135,7 +162,7 @@ pub fn parse(file:Vec<u8>) -> MmfFileInfo {
             }
         }
 
-        let cnti_block_class = stream.read_byte();
+        let cnti_block_class = stream.read_u8();
         match cnti_block_class {
             Ok(class) => {
                 file_info.cnti_block.class = class as _;
@@ -144,7 +171,7 @@ pub fn parse(file:Vec<u8>) -> MmfFileInfo {
             }
         }
 
-        let cnti_block_file_type = stream.read_byte();
+        let cnti_block_file_type = stream.read_u8();
         match cnti_block_file_type {
             Ok(class) => {
                 file_info.cnti_block.file_type = class as _;
@@ -153,7 +180,7 @@ pub fn parse(file:Vec<u8>) -> MmfFileInfo {
             }
         }
 
-        let cnti_block_code_type = stream.read_byte();
+        let cnti_block_code_type = stream.read_u8();
         match cnti_block_code_type {
             Ok(class) => {
                 file_info.cnti_block.code_type = class as _;
@@ -162,7 +189,7 @@ pub fn parse(file:Vec<u8>) -> MmfFileInfo {
             }
         }
 
-        let cnti_block_status = stream.read_byte();
+        let cnti_block_status = stream.read_u8();
         match cnti_block_status {
             Ok(class) => {
                 file_info.cnti_block.status = class as _;
@@ -171,7 +198,7 @@ pub fn parse(file:Vec<u8>) -> MmfFileInfo {
             }
         }
 
-        let cnti_block_counts = stream.read_byte();
+        let cnti_block_counts = stream.read_u8();
         match cnti_block_counts {
             Ok(class) => {
                 file_info.cnti_block.counts = class as _;
@@ -180,6 +207,12 @@ pub fn parse(file:Vec<u8>) -> MmfFileInfo {
             }
         }
     }
+
+    //TODO: Find and read MIDI track
+    let midi_block_signature = "MTR";
+    //find_block_with_tag(&stream, midi_block_signature);
+    let wave_block_signature = "ATR";
+
 
     //Finally, All infos are set.
     file_info.result = MmfParseResult::OK;
