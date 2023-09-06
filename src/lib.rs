@@ -126,13 +126,24 @@ fn find_block_with_tag<R: Read>(stream: &mut R, tag: &[u8]) -> io::Result<Vec<u8
     Err(io::Error::new(io::ErrorKind::NotFound, "Block not found"))
 }
 
+fn find_signature_from_cursor(stream:&mut Cursor<Vec<u8>>, signature: &str) -> bool
+{
+    for sig_byte in signature.as_bytes() {
+        if !stream.read_u8().unwrap() == *sig_byte {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 pub fn parse(file:Vec<u8>) -> MmfFileInfo {
     let mut file_info:MmfFileInfo = MmfFileInfo::new();
 
     let mut stream = Cursor::new(file);
+
     //If not found data in file bytes vector, Just return not found smaf header
-    if !stream.read_u8().unwrap() == b'M' || !stream.read_u8().unwrap() == b'M' ||
-        !stream.read_u8().unwrap() == b'M' || !stream.read_u8().unwrap() == b'D'  {
+    if !find_signature_from_cursor(&mut stream, "MMMD") {
         file_info.result = MmfParseResult::NotFoundSmafHeader;
         return file_info;
     }
@@ -149,8 +160,7 @@ pub fn parse(file:Vec<u8>) -> MmfFileInfo {
     }
     
     //Read content info block info
-    if !stream.read_u8().unwrap() == b'C' || !stream.read_u8().unwrap() == b'N' ||
-        !stream.read_u8().unwrap() == b'T' || !stream.read_u8().unwrap() == b'I'  {
+    if find_signature_from_cursor(&mut stream, "CNTI") {
         file_info.cnti_block.signature = String::from("CNTI");
         
         let cnti_block_size = stream.read_u32::<BigEndian>();
