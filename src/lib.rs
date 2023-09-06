@@ -1,10 +1,5 @@
-use std::io::{self, Cursor, Read};
-use byteorder::{ReadBytesExt, WriteBytesExt, BigEndian, LittleEndian};
-
-trait BlockHeaderBase {
-    fn signature(&self) -> String;
-    fn size(&self) -> Option<usize>;
-}
+use std::io::{self, Cursor, Read, Seek};
+use byteorder::{ReadBytesExt, BigEndian};
 
 struct ContentInfoBlock {
     signature:String,
@@ -16,16 +11,6 @@ struct ContentInfoBlock {
     counts:u8,
     song_title:String,
     version:u8,
-}
-
-impl BlockHeaderBase for ContentInfoBlock {
-    fn signature(&self) -> String {
-        self.signature.clone()
-    }
-
-    fn size(&self) -> Option<usize> {
-        Some(self.size.clone())
-    }
 }
 
 impl Default for ContentInfoBlock {
@@ -45,36 +30,34 @@ impl Default for ContentInfoBlock {
 }
 
 struct MidiTrackBlock {
-    signature:String,
     size:usize,
     track_no:u8,
     data:Vec<u8>,
 }
 
-impl BlockHeaderBase for MidiTrackBlock {
-    fn signature(&self) -> String {
-        self.signature.clone()
-    }
-
-    fn size(&self) -> Option<usize> {
-        Some(self.size.clone())
+impl Default for MidiTrackBlock {
+    fn default() -> Self {
+        MidiTrackBlock {
+            size: 0,
+            track_no: 0,
+            data: Vec::new(),
+        }
     }
 }
 
 struct WaveTrackBlock {
-    signature:String,
     size:usize,
     track_no:u8,
     data:Vec<u8>,
 }
 
-impl BlockHeaderBase for WaveTrackBlock {
-    fn signature(&self) -> String {
-        self.signature.clone()
-    }
-
-    fn size(&self) -> Option<usize> {
-        Some(self.size.clone())
+impl Default for WaveTrackBlock {
+    fn default() -> Self {
+        WaveTrackBlock {
+            size: 0,
+            track_no: 0,
+            data: Vec::new(),
+        }
     }
 }
 
@@ -219,10 +202,49 @@ pub fn parse(file:Vec<u8>) -> MmfFileInfo {
     }
 
     //TODO: Find and read MIDI track
-    let midi_block_signature = "MTR";
-    //find_block_with_tag(&stream, midi_block_signature);
-    let wave_block_signature = "ATR";
+    loop {
+        let mut midi_result = find_block_with_tag(&mut stream, b"MTR");
+        match midi_result {
+            Ok(block_data) => {
+                // Use the new function to create a new MidiTrackBlock instance
+                let mut new_midi_block = MidiTrackBlock::default();
+                new_midi_block.track_no = block_data[0];
+                new_midi_block.size = block_data.len();
+                new_midi_block.data = block_data;
 
+                file_info.midi_blocks.push(new_midi_block);
+            }
+            Err(_err) => {
+                break;
+            }
+        }
+    }
+
+    let mut rewind_result = stream.rewind();
+    match rewind_result {
+        Ok(()) => {
+            loop {
+                let mut wave_result = find_block_with_tag(&mut stream, b"ATR");
+                match wave_result {
+                    Ok(block_data) => {
+                        // Use the new function to create a new MidiTrackBlock instance
+                        let mut new_wave_block = WaveTrackBlock::default();
+                        new_wave_block.track_no = 1;
+                        new_wave_block.size = block_data.len();
+                        new_wave_block.data = block_data;
+
+                        file_info.wave_blocks.push(new_wave_block);
+                    }
+                    Err(_err) => {
+                        break;
+                    }
+                }
+            }
+        }
+        Err(..) => {
+            
+        }
+    }
 
     //Finally, All infos are set.
     file_info.result = MmfParseResult::OK;
