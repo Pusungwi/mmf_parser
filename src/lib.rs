@@ -11,8 +11,8 @@ struct ContentInfoBlock {
     counts:u8,
 }
 
-impl Default for ContentInfoBlock {
-    fn default() -> Self {
+impl ContentInfoBlock {
+    pub fn new() -> ContentInfoBlock {
         ContentInfoBlock {
             signature: String::new(),
             size: 0,
@@ -21,6 +21,18 @@ impl Default for ContentInfoBlock {
             code_type: 0,
             status: 0,
             counts: 0,
+        }
+    }
+}
+
+struct OptionalDataBlock {
+    song_title:String,
+}
+
+impl OptionalDataBlock {
+    pub fn new() -> OptionalDataBlock {
+        OptionalDataBlock {
+            song_title: String::new(),
         }
     }
 }
@@ -52,6 +64,7 @@ pub struct MmfFileInfo {
     result:MmfParseResult,
     data_size:usize,
     cnti_block:ContentInfoBlock,
+    opda_block:OptionalDataBlock,
     midi_blocks:Vec<TrackBlock>,
     wave_blocks:Vec<TrackBlock>,
 }
@@ -61,7 +74,8 @@ impl MmfFileInfo {
         MmfFileInfo {
             result: MmfParseResult::UnknownError,
             data_size: 0,
-            cnti_block: ContentInfoBlock::default(),
+            cnti_block: ContentInfoBlock::new(),
+            opda_block: OptionalDataBlock::new(),
             midi_blocks: Vec::new(),
             wave_blocks: Vec::new(),
         }
@@ -184,6 +198,11 @@ pub fn parse(file:Vec<u8>) -> MmfFileInfo {
             Err(_err) => {
             }
         }
+    }
+
+    //TODO: Read optional data block info (Not required block)
+    if find_signature_from_cursor(&mut stream, "OPDA") {
+        //println!("found signature opda");
     }
 
     //Find and read MIDI track
