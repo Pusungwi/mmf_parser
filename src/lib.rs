@@ -29,31 +29,15 @@ impl Default for ContentInfoBlock {
     }
 }
 
-struct MidiTrackBlock {
+struct TrackBlock {
     size:usize,
     track_no:u8,
     data:Vec<u8>,
 }
 
-impl Default for MidiTrackBlock {
-    fn default() -> Self {
-        MidiTrackBlock {
-            size: 0,
-            track_no: 0,
-            data: Vec::new(),
-        }
-    }
-}
-
-struct WaveTrackBlock {
-    size:usize,
-    track_no:u8,
-    data:Vec<u8>,
-}
-
-impl Default for WaveTrackBlock {
-    fn default() -> Self {
-        WaveTrackBlock {
+impl TrackBlock {
+    pub fn new() -> TrackBlock {
+        TrackBlock {
             size: 0,
             track_no: 0,
             data: Vec::new(),
@@ -72,8 +56,8 @@ pub struct MmfFileInfo {
     result:MmfParseResult,
     data_size:usize,
     cnti_block:ContentInfoBlock,
-    midi_blocks:Vec<MidiTrackBlock>,
-    wave_blocks:Vec<WaveTrackBlock>,
+    midi_blocks:Vec<TrackBlock>,
+    wave_blocks:Vec<TrackBlock>,
 }
 
 impl MmfFileInfo {
@@ -88,25 +72,31 @@ impl MmfFileInfo {
     }
 }
 
-fn find_block_with_tag<R: Read>(stream: &mut R, tag: &[u8]) -> io::Result<Vec<u8>> {
-    let mut buffer = [0; 1024];
-    let mut block = Vec::new();
-
+fn read_track_block(cursor: &mut Cursor<Vec<u8>>, signature: &[u8]) -> Option<TrackBlock> {
+    let mut buffer = Vec::new();
     loop {
-        let bytes_read = stream.read(&mut buffer)?;
-        if bytes_read == 0 {
-            break;
-        }
+        let mut byte_buffer = [0; 1];
+        match cursor.read(&mut byte_buffer) {
+            Ok(0) => break, // end of stream
+            Ok(_) => {
+                buffer.push(byte_buffer[0]);
+                if buffer.ends_with(signature) {
+                    let mut new_block = TrackBlock::new();
+                    new_block.track_no = cursor.read_u8().unwrap();
+                    new_block.size = cursor.read_u32::<BigEndian>().unwrap() as _;
+                    
 
-        block.extend_from_slice(&buffer[..bytes_read]);
-
-        if let Some(index) = block.windows(tag.len()).position(|window| window == tag) {
-            block.truncate(index + tag.len());
-            return Ok(block);
+                    let mut exact_data = vec![0; new_block.size];
+                    let _ = cursor.read_exact(&mut exact_data);
+                    new_block.data.extend_from_slice(&exact_data);
+                    
+                    return Some(new_block);
+                }
+            }
+            Err(_) => break, // error
         }
     }
-
-    Err(io::Error::new(io::ErrorKind::NotFound, "Block not found"))
+    None
 }
 
 fn find_signature_from_cursor(stream:&mut Cursor<Vec<u8>>, signature: &str) -> bool
@@ -203,39 +193,28 @@ pub fn parse(file:Vec<u8>) -> MmfFileInfo {
 
     //TODO: Find and read MIDI track
     loop {
-        let mut midi_result = find_block_with_tag(&mut stream, b"MTR");
+        let midi_result = read_track_block(&mut stream, b"MTR");
         match midi_result {
-            Ok(block_data) => {
+            Some(block_data) => {
                 // Use the new function to create a new MidiTrackBlock instance
-                let mut new_midi_block = MidiTrackBlock::default();
-                new_midi_block.track_no = block_data[0];
-                new_midi_block.size = block_data.len();
-                new_midi_block.data = block_data;
-
-                file_info.midi_blocks.push(new_midi_block);
+                file_info.midi_blocks.push(block_data);
             }
-            Err(_err) => {
+            None => {
                 break;
             }
         }
     }
 
-    let mut rewind_result = stream.rewind();
+    let rewind_result = stream.rewind();
     match rewind_result {
         Ok(()) => {
             loop {
-                let mut wave_result = find_block_with_tag(&mut stream, b"ATR");
+                let wave_result = read_track_block(&mut stream, b"ATR");
                 match wave_result {
-                    Ok(block_data) => {
-                        // Use the new function to create a new MidiTrackBlock instance
-                        let mut new_wave_block = WaveTrackBlock::default();
-                        new_wave_block.track_no = 1;
-                        new_wave_block.size = block_data.len();
-                        new_wave_block.data = block_data;
-
-                        file_info.wave_blocks.push(new_wave_block);
+                    Some(block_data) => {
+                        file_info.wave_blocks.push(block_data);
                     }
-                    Err(_err) => {
+                    None => {
                         break;
                     }
                 }
