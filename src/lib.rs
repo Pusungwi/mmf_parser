@@ -9,8 +9,6 @@ struct ContentInfoBlock {
     code_type:u8,
     status:u8,
     counts:u8,
-    song_title:String,
-    version:u8,
 }
 
 impl Default for ContentInfoBlock {
@@ -23,8 +21,6 @@ impl Default for ContentInfoBlock {
             code_type: 0,
             status: 0,
             counts: 0,
-            song_title: String::new(),
-            version: 0,
         }
     }
 }
@@ -85,7 +81,6 @@ fn read_track_block(cursor: &mut Cursor<Vec<u8>>, signature: &[u8]) -> Option<Tr
                     new_block.track_no = cursor.read_u8().unwrap();
                     new_block.size = cursor.read_u32::<BigEndian>().unwrap() as _;
                     
-
                     let mut exact_data = vec![0; new_block.size];
                     let _ = cursor.read_exact(&mut exact_data);
                     new_block.data.extend_from_slice(&exact_data);
@@ -191,7 +186,7 @@ pub fn parse(file:Vec<u8>) -> MmfFileInfo {
         }
     }
 
-    //TODO: Find and read MIDI track
+    //Find and read MIDI track
     loop {
         let midi_result = read_track_block(&mut stream, b"MTR");
         match midi_result {
@@ -250,9 +245,15 @@ mod tests {
     }
 
     #[test]
-    fn it_works() {
+    fn test_mmf_parsing() {
+        //cd456ee3c9dfb4c7e5f9b2b1c875fd88b0506050e10c359621cbc382df7ab71a  mmf_parser_test.mmf
         let info = parse(get_file_as_byte_vec(&String::from("mmf_parser_test.mmf")));
         assert_eq!(info.result, MmfParseResult::OK);
         assert_eq!(info.data_size, 1625);
+        assert_eq!(info.midi_blocks.len(), 4);
+        assert_eq!(info.midi_blocks[0].size, 636);
+        assert_eq!(info.midi_blocks[1].size, 443);
+        assert_eq!(info.midi_blocks[2].size, 328);
+        assert_eq!(info.midi_blocks[3].size, 146);
     }
 }
