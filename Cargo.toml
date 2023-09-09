@@ -8,6 +8,9 @@ homepage = "https://github.com/Pusungwi/mmf_parser/"
 documentation = "https://docs.rs/mmf_parser"
 repository = "https://github.com/Pusungwi/mmf_parser/"
 readme = "README.md"
+keywords = ["library", "music", "smaf", "mmf"]
+include = ["src/*.rs", "Cargo.toml"]
+exclude = ["*.mmf"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
