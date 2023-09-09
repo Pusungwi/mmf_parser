@@ -2,8 +2,13 @@
 name = "mmf_parser"
 version = "0.1.0"
 edition = "2021"
+license-file = "LICENSE"
+description = "Yamaha SMAF File Parser"
+homepage = "https://github.com/Pusungwi/mmf_parser/"
+documentation = "https://docs.rs/mmf_parser"
+repository = "https://github.com/Pusungwi/mmf_parser/"
+readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 byteorder = "1.4.3"
