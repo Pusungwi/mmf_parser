@@ -82,6 +82,34 @@ impl MmfFileInfo {
     }
 }
 
+fn read_opda_block_info(cursor: &mut Cursor<Vec<u8>>, signature: &[u8]) -> Option<String> {
+    let mut buffer = Vec::new();
+    loop {
+        let mut byte_buffer = [0; 1];
+        match cursor.read(&mut byte_buffer) {
+            Ok(0) => break, // end of stream
+            Ok(_) => {
+                buffer.push(byte_buffer[0]);
+                if buffer.ends_with(signature) {
+                    let info_length = cursor.read_u16::<BigEndian>().unwrap() as usize;                    
+                    let mut exact_data = vec![0; info_length];
+                    let _ = cursor.read_exact(&mut exact_data);
+                    
+                    let read_result = String::from_utf8(exact_data);
+                    match read_result {
+                        Ok(result) => {
+                            return Some(result);
+                        }
+                        Err(_err) => break,
+                    }
+                }
+            }
+            Err(_) => break, // error
+        }
+    }
+    None
+}
+
 fn read_track_block(cursor: &mut Cursor<Vec<u8>>, signature: &[u8]) -> Option<TrackBlock> {
     let mut buffer = Vec::new();
     loop {
@@ -200,9 +228,28 @@ pub fn parse(file:Vec<u8>) -> MmfFileInfo {
         }
     }
 
-    //TODO: Read optional data block info (Not required block)
+    //Read optional data block info (Not required block)
     if find_signature_from_cursor(&mut stream, "OPDA") {
-        //println!("found signature opda");
+        //TODO: signature "ST" and read int is song title length
+        let song_title_result = read_opda_block_info(&mut stream, b"ST");
+        match song_title_result {
+            Some(song_title) => {
+                file_info.opda_block.song_title = song_title;
+            }
+            None => {
+
+            }
+        }
+        
+        //TODO: signature "CA" and read int is copyright author? length
+
+        //TODO: signature "CR" and read int is copyright length
+
+        //TODO: signature "A0"
+
+        //and rewind
+        //TODO: un-optimized find data style
+        let opda_rewind_result = stream.rewind();
     }
 
     //Find and read MIDI track
@@ -219,8 +266,8 @@ pub fn parse(file:Vec<u8>) -> MmfFileInfo {
         }
     }
 
-    let rewind_result = stream.rewind();
-    match rewind_result {
+    let midi_rewind_result = stream.rewind();
+    match midi_rewind_result {
         Ok(()) => {
             loop {
                 let wave_result = read_track_block(&mut stream, b"ATR");
