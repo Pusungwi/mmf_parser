@@ -27,12 +27,16 @@ impl ContentInfoBlock {
 
 struct OptionalDataBlock {
     song_title:String,
+    author:String,
+    copyright:String,
 }
 
 impl OptionalDataBlock {
     pub fn new() -> OptionalDataBlock {
         OptionalDataBlock {
             song_title: String::new(),
+            author: String::new(),
+            copyright: String::new(),
         }
     }
 }
@@ -136,29 +140,27 @@ fn read_track_block(cursor: &mut Cursor<Vec<u8>>, signature: &[u8]) -> Option<Tr
     None
 }
 
-fn find_signature_from_cursor(stream:&mut Cursor<Vec<u8>>, signature: &str) -> bool
-{
+fn find_signature_from_cursor(stream:&mut Cursor<Vec<u8>>, signature: &str) -> bool {
     for sig_byte in signature.as_bytes() {
-        if !stream.read_u8().unwrap() == *sig_byte {
+        if !(stream.read_u8().unwrap() == *sig_byte) {
             return false;
         }
     }
-
-    return true;
+    true
 }
 
 pub fn parse(file:Vec<u8>) -> MmfFileInfo {
     let mut file_info:MmfFileInfo = MmfFileInfo::new();
 
-    let mut stream = Cursor::new(file);
+    let mut file_stream = Cursor::new(file);
 
     //If not found data in file bytes vector, Just return not found smaf header
-    if !find_signature_from_cursor(&mut stream, "MMMD") {
+    if !find_signature_from_cursor(&mut file_stream, "MMMD") {
         file_info.result = MmfParseResult::NotFoundSmafHeader;
         return file_info;
     }
 
-    let smaf_size = stream.read_u32::<BigEndian>();
+    let smaf_size = file_stream.read_u32::<BigEndian>();
     match smaf_size {
         Ok(size) => {
             file_info.data_size = size as _;
@@ -170,10 +172,10 @@ pub fn parse(file:Vec<u8>) -> MmfFileInfo {
     }
     
     //Read content info block info
-    if find_signature_from_cursor(&mut stream, "CNTI") {
+    if find_signature_from_cursor(&mut file_stream, "CNTI") {
         file_info.cnti_block.signature = String::from("CNTI");
         
-        let cnti_block_size = stream.read_u32::<BigEndian>();
+        let cnti_block_size = file_stream.read_u32::<BigEndian>();
         match cnti_block_size {
             Ok(size) => {
                 file_info.cnti_block.size = size as _;
@@ -182,7 +184,7 @@ pub fn parse(file:Vec<u8>) -> MmfFileInfo {
             }
         }
 
-        let cnti_block_class = stream.read_u8();
+        let cnti_block_class = file_stream.read_u8();
         match cnti_block_class {
             Ok(class) => {
                 file_info.cnti_block.class = class as _;
@@ -191,7 +193,7 @@ pub fn parse(file:Vec<u8>) -> MmfFileInfo {
             }
         }
 
-        let cnti_block_file_type = stream.read_u8();
+        let cnti_block_file_type = file_stream.read_u8();
         match cnti_block_file_type {
             Ok(class) => {
                 file_info.cnti_block.file_type = class as _;
@@ -200,7 +202,7 @@ pub fn parse(file:Vec<u8>) -> MmfFileInfo {
             }
         }
 
-        let cnti_block_code_type = stream.read_u8();
+        let cnti_block_code_type = file_stream.read_u8();
         match cnti_block_code_type {
             Ok(class) => {
                 file_info.cnti_block.code_type = class as _;
@@ -209,7 +211,7 @@ pub fn parse(file:Vec<u8>) -> MmfFileInfo {
             }
         }
 
-        let cnti_block_status = stream.read_u8();
+        let cnti_block_status = file_stream.read_u8();
         match cnti_block_status {
             Ok(class) => {
                 file_info.cnti_block.status = class as _;
@@ -218,7 +220,7 @@ pub fn parse(file:Vec<u8>) -> MmfFileInfo {
             }
         }
 
-        let cnti_block_counts = stream.read_u8();
+        let cnti_block_counts = file_stream.read_u8();
         match cnti_block_counts {
             Ok(class) => {
                 file_info.cnti_block.counts = class as _;
@@ -229,32 +231,61 @@ pub fn parse(file:Vec<u8>) -> MmfFileInfo {
     }
 
     //Read optional data block info (Not required block)
-    if find_signature_from_cursor(&mut stream, "OPDA") {
-        //TODO: signature "ST" and read int is song title length
-        let song_title_result = read_opda_block_info(&mut stream, b"ST");
-        match song_title_result {
-            Some(song_title) => {
-                file_info.opda_block.song_title = song_title;
+    if find_signature_from_cursor(&mut file_stream, "OPDA") {
+        let opda_block_size_parse = file_stream.read_u32::<BigEndian>();
+        match opda_block_size_parse {
+            Ok(block_size) => {
+                let mut block_data = vec![0; block_size as _];
+                let _ = file_stream.read_exact(&mut block_data).unwrap();
+                let mut opda_block_stream = Cursor::new(block_data);
+
+                //signature "ST" is song title
+                let song_title_result = read_opda_block_info(&mut opda_block_stream, b"ST");
+                match song_title_result {
+                    Some(song_title) => {
+                        file_info.opda_block.song_title = song_title;
+                    }
+                    None => {
+
+                    }
+                }
+                let _opda_stream_rewind = file_stream.rewind();
+
+                //signature "CA" is copyright author?
+                let author_result = read_opda_block_info(&mut opda_block_stream, b"CA");
+                match author_result {
+                    Some(author_title) => {
+                        file_info.opda_block.author = author_title;
+                    }
+                    None => {
+
+                    }
+                }
+                let _opda_stream_rewind = file_stream.rewind();
+                
+                //signature "CR" is copyright
+                let copyright_result = read_opda_block_info(&mut opda_block_stream, b"CR");
+                match copyright_result {
+                    Some(copyright_title) => {
+                        file_info.opda_block.copyright = copyright_title;
+                    }
+                    None => {
+
+                    }
+                }
+                let _opda_stream_rewind = file_stream.rewind();
+
+                //TODO: signature "A0"
             }
-            None => {
+            Err(_err) => {
 
             }
         }
-        
-        //TODO: signature "CA" and read int is copyright author? length
-
-        //TODO: signature "CR" and read int is copyright length
-
-        //TODO: signature "A0"
-
-        //and rewind
-        //TODO: un-optimized find data style
-        let _opda_rewind_result = stream.rewind();
     }
 
     //Find and read MIDI track
     loop {
-        let midi_result = read_track_block(&mut stream, b"MTR");
+        let midi_result = read_track_block(&mut file_stream, b"MTR");
         match midi_result {
             Some(block_data) => {
                 // Use the new function to create a new MidiTrackBlock instance
@@ -266,11 +297,11 @@ pub fn parse(file:Vec<u8>) -> MmfFileInfo {
         }
     }
 
-    let midi_rewind_result = stream.rewind();
+    let midi_rewind_result = file_stream.rewind();
     match midi_rewind_result {
         Ok(()) => {
             loop {
-                let wave_result = read_track_block(&mut stream, b"ATR");
+                let wave_result = read_track_block(&mut file_stream, b"ATR");
                 match wave_result {
                     Some(block_data) => {
                         file_info.wave_blocks.push(block_data);
