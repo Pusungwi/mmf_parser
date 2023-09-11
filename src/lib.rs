@@ -343,14 +343,14 @@ mod tests {
 
     #[test]
     fn test_mmf_parsing() {
-        //cd456ee3c9dfb4c7e5f9b2b1c875fd88b0506050e10c359621cbc382df7ab71a  mmf_parser_test.mmf
-        let info = parse(get_file_as_byte_vec(&String::from("mmf_parser_test.mmf")));
+        //4a1d512c7cf3845b664946749ff3e7162f92a768d91406e8a91fd0f3f37fa720  MachineWoman.mmf
+        let info = parse(get_file_as_byte_vec(&String::from("MachineWoman.mmf")));
         assert_eq!(info.result, MmfParseResult::OK);
-        assert_eq!(info.data_size, 1625);
-        assert_eq!(info.midi_blocks.len(), 4);
-        assert_eq!(info.midi_blocks[0].size, 636);
-        assert_eq!(info.midi_blocks[1].size, 443);
-        assert_eq!(info.midi_blocks[2].size, 328);
-        assert_eq!(info.midi_blocks[3].size, 146);
+        assert_eq!(info.data_size, 7408);
+        assert_eq!(info.opda_block.song_title, "Machine Woman");
+        assert_eq!(info.opda_block.author, "SMAF MA-3 Sample Data");
+        assert_eq!(info.opda_block.copyright, "Copyright(c) 2002-2004 YAMAHA CORPORATION");
+        assert_eq!(info.midi_blocks.len(), 1);
+        assert_eq!(info.midi_blocks[0].size, 7242);
     }
 }
