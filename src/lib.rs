@@ -249,7 +249,7 @@ pub fn parse(file:Vec<u8>) -> MmfFileInfo {
 
         //and rewind
         //TODO: un-optimized find data style
-        let opda_rewind_result = stream.rewind();
+        let _opda_rewind_result = stream.rewind();
     }
 
     //Find and read MIDI track
