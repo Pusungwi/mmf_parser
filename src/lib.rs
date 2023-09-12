@@ -1,14 +1,14 @@
+use byteorder::{BigEndian, ReadBytesExt};
 use std::io::{Cursor, Read, Seek};
-use byteorder::{ReadBytesExt, BigEndian};
 
 struct ContentInfoBlock {
-    signature:String,
-    size:usize,
-    class:u8,
-    file_type:u8,
-    code_type:u8,
-    status:u8,
-    counts:u8,
+    signature: String,
+    size: usize,
+    class: u8,
+    file_type: u8,
+    code_type: u8,
+    status: u8,
+    counts: u8,
 }
 
 impl ContentInfoBlock {
@@ -26,9 +26,9 @@ impl ContentInfoBlock {
 }
 
 struct OptionalDataBlock {
-    song_title:String,
-    author:String,
-    copyright:String,
+    song_title: String,
+    author: String,
+    copyright: String,
 }
 
 impl OptionalDataBlock {
@@ -42,9 +42,9 @@ impl OptionalDataBlock {
 }
 
 struct TrackBlock {
-    size:usize,
-    track_no:u8,
-    data:Vec<u8>,
+    size: usize,
+    track_no: u8,
+    data: Vec<u8>,
 }
 
 impl TrackBlock {
@@ -65,16 +65,16 @@ pub enum MmfParseResult {
 }
 
 pub struct MmfFileInfo {
-    result:MmfParseResult,
-    data_size:usize,
-    cnti_block:ContentInfoBlock,
-    opda_block:OptionalDataBlock,
-    midi_blocks:Vec<TrackBlock>,
-    wave_blocks:Vec<TrackBlock>,
+    result: MmfParseResult,
+    data_size: usize,
+    cnti_block: ContentInfoBlock,
+    opda_block: OptionalDataBlock,
+    midi_blocks: Vec<TrackBlock>,
+    wave_blocks: Vec<TrackBlock>,
 }
 
-impl MmfFileInfo {
-    pub fn new() -> MmfFileInfo {
+impl Default for MmfFileInfo {
+    fn default() -> MmfFileInfo {
         MmfFileInfo {
             result: MmfParseResult::UnknownError,
             data_size: 0,
@@ -95,10 +95,9 @@ fn read_opda_block_info(cursor: &mut Cursor<Vec<u8>>, signature: &[u8]) -> Optio
             Ok(_) => {
                 buffer.push(byte_buffer[0]);
                 if buffer.ends_with(signature) {
-                    let info_length = cursor.read_u16::<BigEndian>().unwrap() as usize;                    
+                    let info_length = cursor.read_u16::<BigEndian>().unwrap() as usize;
                     let mut exact_data = vec![0; info_length];
                     let _ = cursor.read_exact(&mut exact_data);
-                    
                     let read_result = String::from_utf8(exact_data);
                     match read_result {
                         Ok(result) => {
@@ -126,11 +125,9 @@ fn read_track_block(cursor: &mut Cursor<Vec<u8>>, signature: &[u8]) -> Option<Tr
                     let mut new_block = TrackBlock::new();
                     new_block.track_no = cursor.read_u8().unwrap();
                     new_block.size = cursor.read_u32::<BigEndian>().unwrap() as _;
-                    
                     let mut exact_data = vec![0; new_block.size];
                     let _ = cursor.read_exact(&mut exact_data);
                     new_block.data.extend_from_slice(&exact_data);
-                    
                     return Some(new_block);
                 }
             }
@@ -140,18 +137,17 @@ fn read_track_block(cursor: &mut Cursor<Vec<u8>>, signature: &[u8]) -> Option<Tr
     None
 }
 
-fn find_signature_from_cursor(stream:&mut Cursor<Vec<u8>>, signature: &str) -> bool {
+fn find_signature_from_cursor(stream: &mut Cursor<Vec<u8>>, signature: &str) -> bool {
     for sig_byte in signature.as_bytes() {
-        if !(stream.read_u8().unwrap() == *sig_byte) {
+        if stream.read_u8().unwrap() != *sig_byte {
             return false;
         }
     }
     true
 }
 
-pub fn parse(file:Vec<u8>) -> MmfFileInfo {
-    let mut file_info:MmfFileInfo = MmfFileInfo::new();
-
+pub fn parse(file: Vec<u8>) -> MmfFileInfo {
+    let mut file_info: MmfFileInfo = MmfFileInfo::default();
     let mut file_stream = Cursor::new(file);
 
     //If not found data in file bytes vector, Just return not found smaf header
@@ -236,42 +232,27 @@ pub fn parse(file:Vec<u8>) -> MmfFileInfo {
         match opda_block_size_parse {
             Ok(block_size) => {
                 let mut block_data = vec![0; block_size as _];
-                let _ = file_stream.read_exact(&mut block_data).unwrap();
+                file_stream.read_exact(&mut block_data).unwrap();
                 let mut opda_block_stream = Cursor::new(block_data);
 
                 //signature "ST" is song title
                 let song_title_result = read_opda_block_info(&mut opda_block_stream, b"ST");
-                match song_title_result {
-                    Some(song_title) => {
-                        file_info.opda_block.song_title = song_title;
-                    }
-                    None => {
-
-                    }
+                if let Some(song_title) = song_title_result {
+                    file_info.opda_block.song_title = song_title;
                 }
                 let _opda_stream_rewind = file_stream.rewind();
 
                 //signature "CA" is copyright author?
                 let author_result = read_opda_block_info(&mut opda_block_stream, b"CA");
-                match author_result {
-                    Some(author_title) => {
-                        file_info.opda_block.author = author_title;
-                    }
-                    None => {
-
-                    }
+                if let Some(author_title) = author_result {
+                    file_info.opda_block.author = author_title;
                 }
                 let _opda_stream_rewind = file_stream.rewind();
                 
                 //signature "CR" is copyright
                 let copyright_result = read_opda_block_info(&mut opda_block_stream, b"CR");
-                match copyright_result {
-                    Some(copyright_title) => {
-                        file_info.opda_block.copyright = copyright_title;
-                    }
-                    None => {
-
-                    }
+                if let Some(copyright_title) = copyright_result {
+                    file_info.opda_block.copyright = copyright_title;
                 }
                 let _opda_stream_rewind = file_stream.rewind();
 
@@ -298,22 +279,17 @@ pub fn parse(file:Vec<u8>) -> MmfFileInfo {
     }
 
     let midi_rewind_result = file_stream.rewind();
-    match midi_rewind_result {
-        Ok(()) => {
-            loop {
-                let wave_result = read_track_block(&mut file_stream, b"ATR");
-                match wave_result {
-                    Some(block_data) => {
-                        file_info.wave_blocks.push(block_data);
-                    }
-                    None => {
-                        break;
-                    }
+    if let Ok(()) = midi_rewind_result {
+        loop {
+            let wave_result = read_track_block(&mut file_stream, b"ATR");
+            match wave_result {
+                Some(block_data) => {
+                    file_info.wave_blocks.push(block_data);
                 }
+            None => {
+                break;
             }
-        }
-        Err(..) => {
-            
+            }
         }
     }
 
@@ -330,7 +306,7 @@ mod tests {
     fn get_file_as_byte_vec(filename: &String) -> Vec<u8> {
         match std::fs::read(filename) {
             Ok(bytes) => {
-                return bytes;
+                bytes
             }
             Err(e) => {
                 if e.kind() == std::io::ErrorKind::PermissionDenied {
