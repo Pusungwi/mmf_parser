@@ -65,7 +65,6 @@ pub enum MmfParseResult {
 }
 
 pub struct MmfFileInfo {
-    result: MmfParseResult,
     data_size: usize,
     cnti_block: ContentInfoBlock,
     opda_block: OptionalDataBlock,
@@ -76,7 +75,6 @@ pub struct MmfFileInfo {
 impl Default for MmfFileInfo {
     fn default() -> MmfFileInfo {
         MmfFileInfo {
-            result: MmfParseResult::UnknownError,
             data_size: 0,
             cnti_block: ContentInfoBlock::new(),
             opda_block: OptionalDataBlock::new(),
@@ -146,14 +144,13 @@ fn find_signature_from_cursor(stream: &mut Cursor<Vec<u8>>, signature: &str) -> 
     true
 }
 
-pub fn parse(file: Vec<u8>) -> MmfFileInfo {
+pub fn parse(file: Vec<u8>) -> Result<MmfFileInfo, MmfParseResult> {
     let mut file_info: MmfFileInfo = MmfFileInfo::default();
     let mut file_stream = Cursor::new(file);
 
     //If not found data in file bytes vector, Just return not found smaf header
     if !find_signature_from_cursor(&mut file_stream, "MMMD") {
-        file_info.result = MmfParseResult::NotFoundSmafHeader;
-        return file_info;
+        return Err(MmfParseResult::NotFoundSmafHeader);
     }
 
     let smaf_size = file_stream.read_u32::<BigEndian>();
@@ -162,8 +159,7 @@ pub fn parse(file: Vec<u8>) -> MmfFileInfo {
             file_info.data_size = size as _;
         }
         Err(_err) => {
-            file_info.result = MmfParseResult::UnknownError;
-            return file_info;
+            return Err(MmfParseResult::UnknownError);
         }
     }
     
@@ -294,8 +290,7 @@ pub fn parse(file: Vec<u8>) -> MmfFileInfo {
     }
 
     //Finally, All infos are set.
-    file_info.result = MmfParseResult::OK;
-    file_info
+    Ok(file_info)
 }
 
 #[cfg(test)]
@@ -321,12 +316,18 @@ mod tests {
     fn test_mmf_parsing() {
         //4a1d512c7cf3845b664946749ff3e7162f92a768d91406e8a91fd0f3f37fa720  MachineWoman.mmf
         let info = parse(get_file_as_byte_vec(&String::from("MachineWoman.mmf")));
-        assert_eq!(info.result, MmfParseResult::OK);
-        assert_eq!(info.data_size, 7408);
-        assert_eq!(info.opda_block.song_title, "Machine Woman");
-        assert_eq!(info.opda_block.author, "SMAF MA-3 Sample Data");
-        assert_eq!(info.opda_block.copyright, "Copyright(c) 2002-2004 YAMAHA CORPORATION");
-        assert_eq!(info.midi_blocks.len(), 1);
-        assert_eq!(info.midi_blocks[0].size, 7242);
+        match info {
+            Ok(result) => {
+                assert_eq!(result.data_size, 7408);
+                assert_eq!(result.opda_block.song_title, "Machine Woman");
+                assert_eq!(result.opda_block.author, "SMAF MA-3 Sample Data");
+                assert_eq!(result.opda_block.copyright, "Copyright(c) 2002-2004 YAMAHA CORPORATION");
+                assert_eq!(result.midi_blocks.len(), 1);
+                assert_eq!(result.midi_blocks[0].size, 7242);
+            }
+            Err(e) => {
+                assert_eq!(e, MmfParseResult::OK);
+            }
+        }
     }
 }
