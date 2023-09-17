@@ -1,59 +1,46 @@
 use byteorder::{BigEndian, ReadBytesExt};
 use std::io::{Cursor, Read, Seek};
 
-struct ContentInfoBlock {
-    signature: String,
-    size: usize,
-    class: u8,
-    file_type: u8,
-    code_type: u8,
-    status: u8,
-    counts: u8,
+#[derive(Default)]
+pub struct ContentInfoBlock {
+    pub signature: String,
+    pub size: usize,
+    pub class: u8,
+    pub file_type: u8,
+    pub code_type: u8,
+    pub status: u8,
+    pub counts: u8,
 }
 
 impl ContentInfoBlock {
     pub fn new() -> ContentInfoBlock {
-        ContentInfoBlock {
-            signature: String::new(),
-            size: 0,
-            class: 0,
-            file_type: 0,
-            code_type: 0,
-            status: 0,
-            counts: 0,
-        }
+        ContentInfoBlock::default()
     }
 }
 
-struct OptionalDataBlock {
-    song_title: String,
-    author: String,
-    copyright: String,
+#[derive(Default)]
+pub struct OptionalDataBlock {
+    pub song_title: String,
+    pub author: String,
+    pub copyright: String,
 }
 
 impl OptionalDataBlock {
     pub fn new() -> OptionalDataBlock {
-        OptionalDataBlock {
-            song_title: String::new(),
-            author: String::new(),
-            copyright: String::new(),
-        }
+        OptionalDataBlock::default()
     }
 }
 
-struct TrackBlock {
-    size: usize,
-    track_no: u8,
-    data: Vec<u8>,
+#[derive(Default)]
+pub struct TrackBlock {
+    pub size: usize,
+    pub track_no: u8,
+    pub data: Vec<u8>,
 }
 
 impl TrackBlock {
     pub fn new() -> TrackBlock {
-        TrackBlock {
-            size: 0,
-            track_no: 0,
-            data: Vec::new(),
-        }
+        TrackBlock::default()
     }
 }
 
@@ -64,23 +51,18 @@ pub enum MmfParseResult {
     UnknownError,
 }
 
+#[derive(Default)]
 pub struct MmfFileInfo {
-    data_size: usize,
-    cnti_block: ContentInfoBlock,
-    opda_block: OptionalDataBlock,
-    midi_blocks: Vec<TrackBlock>,
-    wave_blocks: Vec<TrackBlock>,
+    pub data_size: usize,
+    pub cnti_block: ContentInfoBlock,
+    pub opda_block: OptionalDataBlock,
+    pub midi_blocks: Vec<TrackBlock>,
+    pub wave_blocks: Vec<TrackBlock>,
 }
 
-impl Default for MmfFileInfo {
-    fn default() -> MmfFileInfo {
-        MmfFileInfo {
-            data_size: 0,
-            cnti_block: ContentInfoBlock::new(),
-            opda_block: OptionalDataBlock::new(),
-            midi_blocks: Vec::new(),
-            wave_blocks: Vec::new(),
-        }
+impl MmfFileInfo {
+    pub fn new() -> MmfFileInfo {
+        MmfFileInfo::default()
     }
 }
 
