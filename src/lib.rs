@@ -31,10 +31,20 @@ impl OptionalDataBlock {
     }
 }
 
+#[derive(Default, Debug, PartialEq)]
+pub enum TrackType {
+    MIDI,
+    PCM,
+    #[default]
+    Unknown,
+}
+
+
 #[derive(Default)]
 pub struct TrackBlock {
     pub size: usize,
     pub track_no: u8,
+    pub track_type: TrackType,
     pub data: Vec<u8>,
 }
 
@@ -57,7 +67,7 @@ pub struct MmfFileInfo {
     pub cnti_block: ContentInfoBlock,
     pub opda_block: OptionalDataBlock,
     pub midi_blocks: Vec<TrackBlock>,
-    pub wave_blocks: Vec<TrackBlock>,
+    pub pcm_blocks: Vec<TrackBlock>,
 }
 
 impl MmfFileInfo {
@@ -246,8 +256,9 @@ pub fn parse(file: Vec<u8>) -> Result<MmfFileInfo, MmfParseResult> {
     loop {
         let midi_result = read_track_block(&mut file_stream, b"MTR");
         match midi_result {
-            Some(block_data) => {
+            Some(mut block_data) => {
                 // Use the new function to create a new MidiTrackBlock instance
+                block_data.track_type = TrackType::MIDI;
                 file_info.midi_blocks.push(block_data);
             }
             None => {
@@ -261,8 +272,9 @@ pub fn parse(file: Vec<u8>) -> Result<MmfFileInfo, MmfParseResult> {
         loop {
             let wave_result = read_track_block(&mut file_stream, b"ATR");
             match wave_result {
-                Some(block_data) => {
-                    file_info.wave_blocks.push(block_data);
+                Some(mut block_data) => {
+                    block_data.track_type = TrackType::PCM;
+                    file_info.pcm_blocks.push(block_data);
                 }
             None => {
                 break;
@@ -305,6 +317,7 @@ mod tests {
                 assert_eq!(result.opda_block.author, "SMAF MA-3 Sample Data");
                 assert_eq!(result.opda_block.copyright, "Copyright(c) 2002-2004 YAMAHA CORPORATION");
                 assert_eq!(result.midi_blocks.len(), 1);
+                assert_eq!(result.midi_blocks[0].track_type, TrackType::MIDI);
                 assert_eq!(result.midi_blocks[0].size, 7242);
             }
             Err(e) => {
