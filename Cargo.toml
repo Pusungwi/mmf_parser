@@ -1,7 +1,7 @@
 [package]
 name = "mmf_parser"
 version = "0.1.2"
-edition = "2021"
+edition = "2024"
 license-file = "LICENSE"
 description = "Yamaha SMAF File Parser"
 homepage = "https://github.com/Pusungwi/mmf_parser/"
