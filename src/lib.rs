@@ -319,6 +319,7 @@ mod tests {
                 assert_eq!(result.midi_blocks.len(), 1);
                 assert_eq!(result.midi_blocks[0].track_type, TrackType::MIDI);
                 assert_eq!(result.midi_blocks[0].size, 7242);
+                assert_eq!(result.pcm_blocks.len(), 0);
             }
             Err(e) => {
                 assert_eq!(e, MmfParseResult::OK);
